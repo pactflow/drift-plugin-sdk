@@ -1,0 +1,24 @@
+# Releases are driven by knope (https://knope.tech). Each SDK is its own package, released on its own
+# to its own registry at its own version. See Documentation/proposals/repository-and-releases.md §5.
+#
+# To add a language, add a [packages.<name>] entry here. <name> must equal the `name` in
+# sdks/<name>/sdk.toml, because that is what change files name.
+
+[packages.rust]
+versioned_files = ["sdks/rust/drift-plugin-sdk/Cargo.toml"]
+changelog = "sdks/rust/CHANGELOG.md"
+
+# `knope document-change` writes a change file into .changeset/
+[[workflows]]
+name = "document-change"
+
+[[workflows.steps]]
+type = "CreateChangeFile"
+
+# Run by .github/workflows/prepare-release.yml. It only edits files; the workflow commits and pushes.
+# A version that is a decision rather than a sum is given as `--override-version <package>=<version>`.
+[[workflows]]
+name = "prepare-release"
+
+[[workflows.steps]]
+type = "PrepareRelease"

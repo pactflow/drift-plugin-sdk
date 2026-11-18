@@ -1,0 +1,45 @@
+# The recipes every SDK provides. CI and the release workflow use these and nothing else.
+# Run from the repository root with `just sdk rust <recipe>`.
+
+set shell := ["bash", "-euo", "pipefail", "-c"]
+
+default:
+    @just --list
+
+# formatting and lint
+check:
+    cargo fmt --all -- --check
+    cargo clippy --workspace --all-targets --locked -- -D warnings
+
+# unit tests, and the conformance/data-values vectors (once the SDK has the conversion)
+test:
+    cargo test --workspace --locked
+
+# builds each example to <name>.plugin in target/plugins/
+build-examples:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    shopt -s nullglob
+    examples=(examples/*/)
+    if [ ${#examples[@]} -eq 0 ]; then
+        echo "no examples yet"
+        exit 0
+    fi
+    echo "TODO: building a .plugin from an example is not implemented" >&2
+    exit 1
+
+# builds what would be published, without publishing it
+package:
+    cargo package -p drift-plugin-sdk --locked
+
+# publishes; only release.yml runs it. CARGO_REGISTRY_TOKEN comes from crates.io trusted publishing.
+publish:
+    cargo publish -p drift-plugin-sdk --locked
+
+# the version about to be released, read from the package; release.yml tags it
+version:
+    @cargo metadata --no-deps --format-version 1 | jq -r '.packages[] | select(.name == "drift-plugin-sdk") | .version'
+
+# vendors the WIT version sdk.toml names into wit/, refusing one whose SHA-256 is not in wit/wit.lock.json
+sync-wit:
+    python3 ../../scripts/sync-wit.py .

@@ -1,0 +1,22 @@
+name: Change file
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+
+permissions:
+  contents: read
+
+jobs:
+  changeset:
+    # The release pull request consumes the change files; it needs none of its own.
+    if: github.head_ref != 'release'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+      - env:
+          LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
+        run: python3 scripts/check-changeset.py --base "origin/$GITHUB_BASE_REF" --labels "$LABELS"

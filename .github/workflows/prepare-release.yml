@@ -1,0 +1,45 @@
+name: Prepare release
+
+# Run by hand. Pushes a `release` branch; a maintainer opens the pull request from it, so CI runs on it.
+on:
+  workflow_dispatch:
+    inputs:
+      versions:
+        description: >
+          Versions that are a decision rather than a sum, space separated: `rust=0.1.0 python=0.2.0`.
+          Leave empty to take them from the change files.
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: knope-dev/action@v2
+        with:
+          version: 0.23.0
+      - name: Prepare the release
+        env:
+          VERSIONS: ${{ inputs.versions }}
+        run: |
+          args=()
+          for v in $VERSIONS; do args+=(--override-version "$v"); done
+          knope prepare-release "${args[@]}"
+      - name: Push the release branch
+        run: |
+          if git diff --quiet && [ -z "$(git status --porcelain)" ]; then
+            echo "::error::Nothing to release: there are no change files."
+            exit 1
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -C release
+          git add -A
+          git commit -m "chore: prepare release"
+          git push --force origin release

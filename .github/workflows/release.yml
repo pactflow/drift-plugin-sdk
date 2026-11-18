@@ -1,0 +1,70 @@
+name: Release
+
+# Merging the release pull request runs this. For each SDK whose version has no tag it tags, publishes
+# to the SDK's registry and makes a GitHub release with its changelog entry.
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.plan.outputs.matrix }}
+      any: ${{ steps.plan.outputs.any }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: extractions/setup-just@v2
+      # `just version` reads each SDK's version with its own toolchain.
+      - uses: ./.github/actions/setup-rust
+      - id: plan
+        run: python3 scripts/release-plan.py
+
+  release:
+    name: ${{ matrix.sdk }} ${{ matrix.version }}
+    needs: plan
+    if: needs.plan.outputs.any == 'true'
+    runs-on: ubuntu-latest
+    # Secrets and trusted-publisher claims are bound to this environment, which requires approval.
+    environment: release
+    permissions:
+      contents: write   # tags and GitHub releases
+      id-token: write   # trusted publishing, npm provenance, PyPI attestations
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.plan.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: extractions/setup-just@v2
+
+      # `uses` cannot be computed, so each SDK has a step here. Adding a language adds one.
+      - if: matrix.sdk == 'rust'
+        uses: ./.github/actions/setup-rust
+        with:
+          publish: "true"
+
+      - name: Tag
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "${{ matrix.tag }}" -m "${{ matrix.sdk }} ${{ matrix.version }}"
+          git push origin "refs/tags/${{ matrix.tag }}"
+      - name: Publish
+        run: just sdk ${{ matrix.sdk }} publish
+      - name: GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 scripts/changelog-entry.py "sdks/${{ matrix.sdk }}/CHANGELOG.md" "${{ matrix.version }}" > notes.md
+          gh release create "${{ matrix.tag }}" --title "${{ matrix.sdk }} ${{ matrix.version }}" --notes-file notes.md

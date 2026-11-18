@@ -1,0 +1,27 @@
+name: Set up Rust
+description: Installs the toolchain the Rust SDK (sdks/rust) needs. One of these per SDK, named setup-<sdk>.
+
+inputs:
+  publish:
+    description: "Also authenticate to crates.io by trusted publishing. The job needs id-token: write."
+    default: "false"
+
+runs:
+  using: composite
+  steps:
+    - uses: dtolnay/rust-toolchain@stable
+      with:
+        components: rustfmt, clippy
+    - uses: Swatinem/rust-cache@v2
+      with:
+        workspaces: sdks/rust
+    - if: inputs.publish == 'true'
+      id: crates-io-auth
+      uses: rust-lang/crates-io-auth-action@v1
+    - if: inputs.publish == 'true'
+      shell: bash
+      env:
+        TOKEN: ${{ steps.crates-io-auth.outputs.token }}
+      run: |
+        echo "::add-mask::$TOKEN"
+        echo "CARGO_REGISTRY_TOKEN=$TOKEN" >> "$GITHUB_ENV"

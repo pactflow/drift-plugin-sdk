@@ -1,0 +1,13 @@
+[package]
+name = "drift-plugin-sdk"
+# Set by knope when a release is prepared; do not edit by hand.
+version = "0.0.0"
+description = "SDK for writing Drift plugins in Rust"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+readme = "README.md"
+keywords = ["drift", "plugin", "wasm", "component-model"]
+categories = ["wasm", "development-tools"]
+
+[dependencies]

@@ -1,0 +1,72 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Reads sdks/*/sdk.toml and the changed paths, and emits the SDKs to run.
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.plan.outputs.matrix }}
+      any: ${{ steps.plan.outputs.any }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: plan
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = pull_request ]; then
+            base="origin/$GITHUB_BASE_REF"
+          else
+            base="${{ github.event.before }}"
+          fi
+          python3 scripts/plan.py --base "$base"
+
+  sdk:
+    name: ${{ matrix.sdk }}
+    needs: plan
+    if: needs.plan.outputs.any == 'true'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.plan.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: extractions/setup-just@v2
+
+      # `uses` cannot be computed, so each SDK has a step here. Adding a language adds one.
+      - if: matrix.sdk == 'rust'
+        uses: ./.github/actions/setup-rust
+
+      # The vendored WIT must be the published file.
+      - name: Vendored WIT matches the published file
+        run: |
+          just sdk ${{ matrix.sdk }} sync-wit
+          git diff --exit-code -- sdks/${{ matrix.sdk }}/wit
+      - run: just sdk ${{ matrix.sdk }} check
+      - run: just sdk ${{ matrix.sdk }} test
+      - run: just sdk ${{ matrix.sdk }} build-examples
+      - run: just sdk ${{ matrix.sdk }} package
+
+  # One required check for branch protection, whichever SDKs ran.
+  ci:
+    needs: [plan, sdk]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          [ "${{ needs.plan.result }}" = success ] || exit 1
+          [ "${{ needs.sdk.result }}" = success ] || [ "${{ needs.sdk.result }}" = skipped ]
+
+  # TODO: end-to-end. Download a Drift bundle pinned by version, check it against its SHA256SUMS,
+  # install the examples' .plugin files and run conformance/suites. Needs the Rust SDK's first example.
