@@ -1,6 +1,6 @@
 # Drift Plugin SDKs
 
-SDKs for writing [Drift](https://pactflow.io) plugins: user-contributed WebAssembly components that
+SDKs for writing [Drift](https://support.smartbear.com/swagger/docs/contract-testing/drift/) plugins: user-contributed WebAssembly components that
 implement the `drift:plugins` WIT contract.
 
 > This repository is being set up. No SDK has been released yet.
