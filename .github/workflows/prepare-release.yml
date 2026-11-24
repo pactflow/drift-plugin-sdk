@@ -28,8 +28,10 @@ jobs:
         env:
           VERSIONS: ${{ inputs.versions }}
         run: |
-          args=()
-          for v in $VERSIONS; do args+=(--override-version "$v"); done
+          # knope's syntax for an override depends on how many packages there are; the script knows.
+          # Not `mapfile < <(...)`: that would hide a failure of the script, and release without the override.
+          out=$(python3 scripts/override-versions.py "$VERSIONS")
+          read -r -a args <<< "$out"
           knope prepare-release "${args[@]}"
       - name: Push the release branch
         run: |

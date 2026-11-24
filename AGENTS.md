@@ -71,6 +71,10 @@ justfile          delegates only: `just sdk <name> <recipe>`
   request that you know will fail it.
 - Do not run `publish`, `release.yml` or `prepare-release.yml`, push tags, or create GitHub releases.
   Publishing is for the `release` workflow in the `release` environment.
+- `knope.toml` lists each file that holds an SDK's version (`versioned_files`), the lock file included
+  where the toolchain has one that records it. A release's `package` step fails on a file left behind.
+  To try a release without making one, run `knope prepare-release --dry-run` in a scratch
+  `git worktree`, never in your own tree: without `--dry-run` it deletes the change files.
 - Tags are `<package>/v<version>`; an SDK may set `tag-prefix` in `sdk.toml` (Go will).
 
 ## Adding a language
@@ -130,4 +134,7 @@ So you do not mistake absence for a bug:
 - `conformance/data-values/` has vectors. `conformance/suites/` has none, and the end-to-end CI job that
   runs suites against a pinned Drift bundle is a TODO in `ci.yml`.
 - The plugin guide has not been moved here from Drift.
-- The first release must be given a version: `prepare-release.yml` with `rust=<version>`.
+- Nothing has been released. The first release needs a maintainer: the `release` environment, a first
+  publish by hand to claim the crate name, and a trusted publisher on crates.io; see
+  [`Documentation/releasing.md`](Documentation/releasing.md). It must also be given a version:
+  `prepare-release.yml` with `rust=<version>`.

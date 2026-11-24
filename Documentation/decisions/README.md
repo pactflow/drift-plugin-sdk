@@ -10,3 +10,4 @@ accepted record to change the decision. Write a new one that supersedes it.
 |---|---|
 | [0001](0001-rust-value-type.md) | The Rust SDK has its own value type |
 | [0002](0002-rust-bindings-and-manifest.md) | The Rust SDK generates only the `data-values` bindings, and converts its manifest into a plugin's own |
+| [0003](0003-release-process.md) | The release process publishes before it tags, bumps `Cargo.lock`, and builds knope's version override from `knope.toml` |

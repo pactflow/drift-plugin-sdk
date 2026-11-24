@@ -5,7 +5,9 @@
 # sdks/<name>/sdk.toml, because that is what change files name.
 
 [packages.rust]
-versioned_files = ["sdks/rust/drift-plugin-sdk/Cargo.toml"]
+# Cargo.lock records the crate's own version too, and `cargo package --locked` refuses a lock file that
+# is out of date, so it is bumped with the manifest.
+versioned_files = ["sdks/rust/drift-plugin-sdk/Cargo.toml", "sdks/rust/Cargo.lock"]
 changelog = "sdks/rust/CHANGELOG.md"
 
 # `knope document-change` writes a change file into .changeset/
