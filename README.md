@@ -14,15 +14,21 @@ implement the `drift:plugins` WIT contract.
 
 Status is `experimental`, `beta` or `stable`, and is set in each SDK's `sdk.toml`.
 
+To see what a plugin looks like, read the Rust example, [`text-plugin`](sdks/rust/examples/text-plugin).
+
 ## Compatibility
 
 Three versions are kept apart: an SDK's version, the WIT's, and Drift's bundle version. Each SDK's README
 and release notes name the WIT it targets; this table maps WIT versions to the first Drift bundle that
-implements them. It is generated from Drift's release records, not written by hand.
+implements them.
 
 | WIT (`drift:plugins`) | First Drift bundle |
 |---|---|
-| `1.0.0` | not yet released |
+| `1.0.0` | `2610.2.0` |
+
+The table is written by hand, from the `index.json` that Drift publishes beside the WIT
+(`https://download.pactflow.io/drift/wit/index.json`). The proposal has it generated from Drift's release
+records. That is not done yet.
 
 ## Repository
 

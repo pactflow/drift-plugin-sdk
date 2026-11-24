@@ -12,6 +12,8 @@ runs:
     - uses: dtolnay/rust-toolchain@stable
       with:
         components: rustfmt, clippy
+        # Examples build to WebAssembly components
+        targets: wasm32-wasip2
     - uses: Swatinem/rust-cache@v2
       with:
         workspaces: sdks/rust

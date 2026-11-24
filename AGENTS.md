@@ -121,10 +121,12 @@ So you do not mistake absence for a bug:
 
 - `wit/wit.lock.json` has `drift:plugins@1.0.0` only; a version Drift publishes later is added to it as
   its own change.
-- The Rust crate has `DataValue` and its `data-value` conversion, and the generated types for the
-  `data-values` interface only. It has no bindings for the rest of the WIT, no manifest builder and no
-  helpers for events or plugin config. There are no examples, so `build-examples` does nothing, and the
-  `.plugin` packaging it will need is not defined.
+- The Rust crate has `DataValue` and its `data-value` conversion, a `Manifest` builder, and the generated
+  types for the `data-values` interface only. It has no bindings for the rest of the WIT and no helpers
+  for events or plugin config. A plugin runs `wit-bindgen` for its own world; see
+  `Documentation/decisions/0002-rust-bindings-and-manifest.md`. There is one example, `text-plugin`, and
+  `build-examples` builds each example to `target/plugins/<name>.plugin`. There is no `cargo generate`
+  template.
 - `conformance/data-values/` has vectors. `conformance/suites/` has none, and the end-to-end CI job that
   runs suites against a pinned Drift bundle is a TODO in `ci.yml`.
 - The plugin guide has not been moved here from Drift.
