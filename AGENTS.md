@@ -63,7 +63,12 @@ justfile          delegates only: `just sdk <name> <recipe>`
   document-change`, or write it by hand as in [CONTRIBUTING.md](CONTRIBUTING.md)), unless it is a
   refactor or test, which the pull request marks `no-release`. Choose the bump from the SDK's public
   API: new API is `minor`, a break is `major`, a fix is `patch` (before 1.0, as the SDK's own docs say).
-  Documentation, CI and `wit/` changes need none.
+  Documentation, CI and the root `wit/wit.lock.json` need none. The vendored `sdks/<name>/wit/` is under
+  `sdks/<name>/`, so changing it **does** need one.
+- Before you open a pull request, commit everything, then run `just check-changeset origin/main`; it
+  compares committed changes only, and it is what the `changeset` check on the pull request runs. If it
+  fails, add the change file (or ask for `no-release`) in the same pull request. Do not open a pull
+  request that you know will fail it.
 - Do not run `publish`, `release.yml` or `prepare-release.yml`, push tags, or create GitHub releases.
   Publishing is for the `release` workflow in the `release` environment.
 - Tags are `<package>/v<version>`; an SDK may set `tag-prefix` in `sdk.toml` (Go will).
