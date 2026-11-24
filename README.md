@@ -1,6 +1,6 @@
 # Drift Plugin SDKs
 
-SDKs for writing [Drift](https://pactflow.io) plugins: user-contributed WebAssembly components that
+SDKs for writing [Drift](https://support.smartbear.com/swagger/docs/contract-testing/drift/) plugins: user-contributed WebAssembly components that
 implement the `drift:plugins` WIT contract.
 
 > The Rust SDK is released as `0.1.0` and is experimental. The other languages are not started.

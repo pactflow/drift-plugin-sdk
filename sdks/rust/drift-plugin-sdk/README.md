@@ -1,6 +1,6 @@
 # drift-plugin-sdk
 
-SDK for writing [Drift](https://pactflow.io) plugins in Rust.
+SDK for writing [Drift](https://support.smartbear.com/swagger/docs/contract-testing/drift/) plugins in Rust.
 
 This crate is at an early stage and its API will change. It targets the WIT package
 `drift:plugins@1.0.0`. It has:
