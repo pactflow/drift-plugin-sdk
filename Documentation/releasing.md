@@ -9,7 +9,8 @@ changelog or a tag by hand: knope sets the versions from the change files in `.c
 
 ## One-time setup
 
-Not done yet for the Rust SDK. Until it is, `release.yml` cannot publish.
+Done for the Rust SDK: the `release` environment, the crate (`0.0.0` was the first publish) and its
+trusted publisher. `0.1.0` was the first release made by the workflow. This is what the next SDK needs.
 
 1. **The `release` environment.** In the repository's settings, create the environment `release`. Require
    a reviewer, and allow deployments from `main` only. The workflow's publish job is bound to it, and

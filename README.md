@@ -3,14 +3,14 @@
 SDKs for writing [Drift](https://pactflow.io) plugins: user-contributed WebAssembly components that
 implement the `drift:plugins` WIT contract.
 
-> This repository is being set up. No SDK has been released yet.
+> The Rust SDK is released as `0.1.0` and is experimental. The other languages are not started.
 > See [the proposal](Documentation/proposals/repository-and-releases.md) for how it is organised.
 
 ## SDKs
 
 | SDK | Directory | Status | WIT | Package |
 |---|---|---|---|---|
-| Rust | [`sdks/rust`](sdks/rust) | experimental | `1.0.0` | `drift-plugin-sdk` on crates.io (not yet published) |
+| Rust | [`sdks/rust`](sdks/rust) | experimental | `1.0.0` | [`drift-plugin-sdk`](https://crates.io/crates/drift-plugin-sdk) on crates.io, [docs](https://docs.rs/drift-plugin-sdk) |
 
 Status is `experimental`, `beta` or `stable`, and is set in each SDK's `sdk.toml`.
 
