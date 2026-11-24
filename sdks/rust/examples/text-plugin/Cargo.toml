@@ -1,0 +1,17 @@
+[package]
+name = "text-plugin"
+version = "0.0.0"
+description = "Example Drift plugin: a data format for plain text"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+drift-plugin-sdk = { path = "../../drift-plugin-sdk" }
+# The same minor as the SDK's.
+wit-bindgen = "0.62"

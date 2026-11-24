@@ -1,0 +1,7 @@
+package component:text-plugin;
+
+// What this plugin implements. It imports nothing from Drift.
+world text-plugin {
+  export drift:plugins/plugin-manifest@1.0.0;
+  export drift:plugins/data-format@1.0.0;
+}

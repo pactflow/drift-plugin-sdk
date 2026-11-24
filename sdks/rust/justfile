@@ -15,7 +15,8 @@ check:
 test:
     cargo test --workspace --locked
 
-# builds each example to <name>.plugin in target/plugins/
+# builds each example to <name>.plugin in target/plugins/. A .plugin is the WebAssembly component the
+# crate builds, so an example's directory name must be its package name.
 build-examples:
     #!/usr/bin/env bash
     set -euo pipefail
@@ -25,8 +26,14 @@ build-examples:
         echo "no examples yet"
         exit 0
     fi
-    echo "TODO: building a .plugin from an example is not implemented" >&2
-    exit 1
+    target_dir=$(cargo metadata --no-deps --format-version 1 | jq -r .target_directory)
+    mkdir -p "$target_dir/plugins"
+    for example in "${examples[@]}"; do
+        name=$(basename "$example")
+        cargo build --locked --release --target wasm32-wasip2 -p "$name"
+        cp "$target_dir/wasm32-wasip2/release/${name//-/_}.wasm" "$target_dir/plugins/$name.plugin"
+        echo "built $target_dir/plugins/$name.plugin"
+    done
 
 # builds what would be published, without publishing it
 package:
