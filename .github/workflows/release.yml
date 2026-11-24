@@ -1,7 +1,7 @@
 name: Release
 
-# Merging the release pull request runs this. For each SDK whose version has no tag it tags, publishes
-# to the SDK's registry and makes a GitHub release with its changelog entry.
+# Merging the release pull request runs this. For each SDK whose version has no tag it publishes to the
+# SDK's registry, tags, and makes a GitHub release with its changelog entry.
 on:
   push:
     branches: [main]
@@ -54,14 +54,16 @@ jobs:
         with:
           publish: "true"
 
+      # Publish first. A tag is what marks a version as released, so a tag made before a publish that
+      # then fails would leave the version looking released and never be tried again.
+      - name: Publish
+        run: just sdk ${{ matrix.sdk }} publish
       - name: Tag
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git tag -a "${{ matrix.tag }}" -m "${{ matrix.sdk }} ${{ matrix.version }}"
           git push origin "refs/tags/${{ matrix.tag }}"
-      - name: Publish
-        run: just sdk ${{ matrix.sdk }} publish
       - name: GitHub release
         env:
           GH_TOKEN: ${{ github.token }}

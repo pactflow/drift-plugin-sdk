@@ -45,5 +45,6 @@ one it targets with `just sdk <name> sync-wit`.
 ## Releases
 
 Maintainers release. `prepare-release.yml` (run by hand) pushes a `release` branch with the versions and
-changelogs; merging its pull request runs `release.yml`, which tags, publishes and creates the GitHub
+changelogs; merging its pull request runs `release.yml`, which publishes, tags and creates the GitHub
 release for each SDK whose version has no tag. Tags are `<package>/v<version>`, for example `rust/v0.3.0`.
+The steps, and the setup a first release needs, are in [Documentation/releasing.md](Documentation/releasing.md).
