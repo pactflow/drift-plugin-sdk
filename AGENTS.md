@@ -119,11 +119,13 @@ commit.
 
 So you do not mistake absence for a bug:
 
-- `wit/wit.lock.json` has no versions until Drift publishes `drift:plugins@1.0.0`, so `sync-wit` fails
-  and so does the CI step that runs it.
-- The Rust crate has no API; there are no examples, so `build-examples` does nothing, and the `.plugin`
-  packaging it will need is not defined.
-- `conformance/` has no vectors or suites, and the end-to-end CI job that runs them against a pinned
-  Drift bundle is a TODO in `ci.yml`.
+- `wit/wit.lock.json` has `drift:plugins@1.0.0` only; a version Drift publishes later is added to it as
+  its own change.
+- The Rust crate has `DataValue` and its `data-value` conversion, and the generated types for the
+  `data-values` interface only. It has no bindings for the rest of the WIT, no manifest builder and no
+  helpers for events or plugin config. There are no examples, so `build-examples` does nothing, and the
+  `.plugin` packaging it will need is not defined.
+- `conformance/data-values/` has vectors. `conformance/suites/` has none, and the end-to-end CI job that
+  runs suites against a pinned Drift bundle is a TODO in `ci.yml`.
 - The plugin guide has not been moved here from Drift.
 - The first release must be given a version: `prepare-release.yml` with `rust=<version>`.

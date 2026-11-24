@@ -6,5 +6,7 @@ members = ["drift-plugin-sdk", "examples/*"]
 
 [workspace.package]
 edition = "2021"
+# as_chunks is stable from 1.88
+rust-version = "1.88"
 license = "Apache-2.0"
 repository = "https://github.com/pactflow/drift-plugin-sdk"
