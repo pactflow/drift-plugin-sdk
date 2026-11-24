@@ -1,0 +1,310 @@
+{
+  "format": 1,
+  "vectors": [
+    { "name": "null",
+      "value": { "type": "null" },
+      "wit": { "value": { "type": "null" }, "nodes": null } },
+    { "name": "string",
+      "value": { "type": "string", "value": "hello" },
+      "wit": { "value": { "type": "str", "value": "hello" }, "nodes": null } },
+    { "name": "empty string",
+      "value": { "type": "string", "value": "" },
+      "wit": { "value": { "type": "str", "value": "" }, "nodes": null } },
+    { "name": "string with non-ASCII text",
+      "value": { "type": "string", "value": "héllo 😀" },
+      "wit": { "value": { "type": "str", "value": "héllo 😀" }, "nodes": null } },
+    { "name": "integer",
+      "value": { "type": "int", "value": "100" },
+      "wit": { "value": { "type": "int", "value": "100" }, "nodes": null } },
+    { "name": "smallest integer",
+      "value": { "type": "int", "value": "-9223372036854775808" },
+      "wit": { "value": { "type": "int", "value": "-9223372036854775808" }, "nodes": null } },
+    { "name": "largest integer",
+      "value": { "type": "int", "value": "9223372036854775807" },
+      "wit": { "value": { "type": "int", "value": "9223372036854775807" }, "nodes": null } },
+    { "name": "unsigned integer",
+      "value": { "type": "uint", "value": "100" },
+      "wit": { "value": { "type": "uint", "value": "100" }, "nodes": null } },
+    { "name": "largest unsigned integer",
+      "value": { "type": "uint", "value": "18446744073709551615" },
+      "wit": { "value": { "type": "uint", "value": "18446744073709551615" }, "nodes": null } },
+    { "name": "double",
+      "value": { "type": "double", "value": 100.12 },
+      "wit": { "value": { "type": "double", "value": 100.12 }, "nodes": null } },
+    { "name": "boolean true",
+      "value": { "type": "boolean", "value": true },
+      "wit": { "value": { "type": "boolean", "value": true }, "nodes": null } },
+    { "name": "boolean false",
+      "value": { "type": "boolean", "value": false },
+      "wit": { "value": { "type": "boolean", "value": false }, "nodes": null } },
+    { "name": "bytes",
+      "value": { "type": "bytes", "value": "010203" },
+      "wit": { "value": { "type": "bytes", "value": "010203" }, "nodes": null } },
+    { "name": "empty bytes",
+      "value": { "type": "bytes", "value": "" },
+      "wit": { "value": { "type": "bytes", "value": "" }, "nodes": null } },
+    { "name": "error",
+      "value": { "type": "error", "value": "boom!" },
+      "wit": { "value": { "type": "error", "value": "boom!" }, "nodes": null } },
+
+    { "name": "empty list has an empty node list, not none",
+      "value": { "type": "list", "value": [] },
+      "wit": { "value": { "type": "list", "value": [] }, "nodes": [] } },
+    { "name": "empty map has an empty node list, not none",
+      "value": { "type": "map", "value": {} },
+      "wit": { "value": { "type": "map", "value": [] }, "nodes": [] } },
+    { "name": "list of scalars",
+      "value": { "type": "list", "value": [
+        { "type": "int", "value": "100" },
+        { "type": "uint", "value": "100" },
+        { "type": "boolean", "value": true }
+      ] },
+      "wit": { "value": { "type": "list", "value": [0, 1, 2] }, "nodes": [
+        { "type": "int", "value": "100" },
+        { "type": "uint", "value": "100" },
+        { "type": "boolean", "value": true }
+      ] } },
+    { "name": "list with a nested list: a node's children follow it",
+      "value": { "type": "list", "value": [
+        { "type": "int", "value": "100" },
+        { "type": "uint", "value": "100" },
+        { "type": "list", "value": [
+          { "type": "int", "value": "200" },
+          { "type": "uint", "value": "200" }
+        ] }
+      ] },
+      "wit": { "value": { "type": "list", "value": [0, 1, 2] }, "nodes": [
+        { "type": "int", "value": "100" },
+        { "type": "uint", "value": "100" },
+        { "type": "list", "value": [3, 4] },
+        { "type": "int", "value": "200" },
+        { "type": "uint", "value": "200" }
+      ] } },
+    { "name": "list nested three deep, with a sibling after the nesting",
+      "value": { "type": "list", "value": [
+        { "type": "int", "value": "100" },
+        { "type": "uint", "value": "100" },
+        { "type": "list", "value": [
+          { "type": "int", "value": "200" },
+          { "type": "list", "value": [
+            { "type": "int", "value": "300" },
+            { "type": "uint", "value": "300" }
+          ] },
+          { "type": "int", "value": "200" }
+        ] }
+      ] },
+      "wit": { "value": { "type": "list", "value": [0, 1, 2] }, "nodes": [
+        { "type": "int", "value": "100" },
+        { "type": "uint", "value": "100" },
+        { "type": "list", "value": [3, 4, 7] },
+        { "type": "int", "value": "200" },
+        { "type": "list", "value": [5, 6] },
+        { "type": "int", "value": "300" },
+        { "type": "uint", "value": "300" },
+        { "type": "int", "value": "200" }
+      ] } },
+    { "name": "empty lists nested in each other",
+      "value": { "type": "list", "value": [
+        { "type": "list", "value": [ { "type": "list", "value": [] } ] }
+      ] },
+      "wit": { "value": { "type": "list", "value": [0] }, "nodes": [
+        { "type": "list", "value": [1] },
+        { "type": "list", "value": [] }
+      ] } },
+    { "name": "list of mixed values",
+      "value": { "type": "list", "value": [
+        { "type": "null" },
+        { "type": "string", "value": "a" },
+        { "type": "map", "value": { "k": { "type": "list", "value": [ { "type": "boolean", "value": true } ] } } }
+      ] },
+      "wit": { "value": { "type": "list", "value": [0, 1, 2] }, "nodes": [
+        { "type": "null" },
+        { "type": "str", "value": "a" },
+        { "type": "map", "value": [["k", 3]] },
+        { "type": "list", "value": [4] },
+        { "type": "boolean", "value": true }
+      ] } },
+
+    { "name": "map of scalars",
+      "value": { "type": "map", "value": {
+        "a": { "type": "int", "value": "100" },
+        "b": { "type": "uint", "value": "100" },
+        "c": { "type": "boolean", "value": true }
+      } },
+      "wit": { "value": { "type": "map", "value": [["a", 0], ["b", 1], ["c", 2]] }, "nodes": [
+        { "type": "int", "value": "100" },
+        { "type": "uint", "value": "100" },
+        { "type": "boolean", "value": true }
+      ] } },
+    { "name": "map with a list",
+      "value": { "type": "map", "value": {
+        "a": { "type": "int", "value": "100" },
+        "b": { "type": "list", "value": [
+          { "type": "int", "value": "200" },
+          { "type": "uint", "value": "200" }
+        ] },
+        "c": { "type": "boolean", "value": true }
+      } },
+      "wit": { "value": { "type": "map", "value": [["a", 0], ["b", 1], ["c", 4]] }, "nodes": [
+        { "type": "int", "value": "100" },
+        { "type": "list", "value": [2, 3] },
+        { "type": "int", "value": "200" },
+        { "type": "uint", "value": "200" },
+        { "type": "boolean", "value": true }
+      ] } },
+    { "name": "map nested three deep",
+      "value": { "type": "map", "value": {
+        "a": { "type": "int", "value": "100" },
+        "b": { "type": "map", "value": {
+          "d": { "type": "int", "value": "200" },
+          "e": { "type": "map", "value": {
+            "f": { "type": "int", "value": "300" },
+            "g": { "type": "uint", "value": "300" }
+          } }
+        } },
+        "c": { "type": "boolean", "value": true }
+      } },
+      "wit": { "value": { "type": "map", "value": [["a", 0], ["b", 1], ["c", 6]] }, "nodes": [
+        { "type": "int", "value": "100" },
+        { "type": "map", "value": [["d", 2], ["e", 3]] },
+        { "type": "int", "value": "200" },
+        { "type": "map", "value": [["f", 4], ["g", 5]] },
+        { "type": "int", "value": "300" },
+        { "type": "uint", "value": "300" },
+        { "type": "boolean", "value": true }
+      ] } },
+    { "name": "map keys are sorted as UTF-8 bytes: uppercase before lowercase",
+      "value": { "type": "map", "value": {
+        "b": { "type": "int", "value": "1" },
+        "a": { "type": "int", "value": "2" },
+        "B": { "type": "int", "value": "3" }
+      } },
+      "wit": { "value": { "type": "map", "value": [["B", 0], ["a", 1], ["b", 2]] }, "nodes": [
+        { "type": "int", "value": "3" },
+        { "type": "int", "value": "2" },
+        { "type": "int", "value": "1" }
+      ] } },
+    { "name": "map keys are sorted as UTF-8 bytes: ASCII before two-byte characters",
+      "value": { "type": "map", "value": {
+        "é": { "type": "int", "value": "1" },
+        "z": { "type": "int", "value": "2" }
+      } },
+      "wit": { "value": { "type": "map", "value": [["z", 0], ["é", 1]] }, "nodes": [
+        { "type": "int", "value": "2" },
+        { "type": "int", "value": "1" }
+      ] } },
+    { "name": "map keys are sorted as UTF-8 bytes, not UTF-16 units: U+FF5E before U+1F600",
+      "value": { "type": "map", "value": {
+        "😀": { "type": "int", "value": "1" },
+        "～": { "type": "int", "value": "2" }
+      } },
+      "wit": { "value": { "type": "map", "value": [["～", 0], ["😀", 1]] }, "nodes": [
+        { "type": "int", "value": "2" },
+        { "type": "int", "value": "1" }
+      ] } },
+
+    { "name": "unpack only: UTF-16LE text",
+      "pack": false,
+      "value": { "type": "string", "value": "hé" },
+      "wit": { "value": { "type": "str", "value": { "encoding": "UTF-16LE", "data": "6800e900" } }, "nodes": null } },
+    { "name": "unpack only: UTF-16BE text",
+      "pack": false,
+      "value": { "type": "string", "value": "hé" },
+      "wit": { "value": { "type": "str", "value": { "encoding": "UTF-16BE", "data": "006800e9" } }, "nodes": null } },
+    { "name": "unpack only: UTF-16 with a surrogate pair",
+      "pack": false,
+      "value": { "type": "string", "value": "😀" },
+      "wit": { "value": { "type": "str", "value": { "encoding": "UTF-16LE", "data": "3dd800de" } }, "nodes": null } },
+    { "name": "unpack only: the encoding name is not case sensitive",
+      "pack": false,
+      "value": { "type": "string", "value": "hé" },
+      "wit": { "value": { "type": "str", "value": { "encoding": "utf-16le", "data": "6800e900" } }, "nodes": null } },
+    { "name": "unpack only: UTF-8 named explicitly",
+      "pack": false,
+      "value": { "type": "string", "value": "hé" },
+      "wit": { "value": { "type": "str", "value": { "encoding": "UTF-8", "data": "68c3a9" } }, "nodes": null } },
+    { "name": "unpack only: an unknown encoding is read as UTF-8",
+      "pack": false,
+      "value": { "type": "string", "value": "abc" },
+      "wit": { "value": { "type": "str", "value": { "encoding": "latin-1", "data": "616263" } }, "nodes": null } },
+    { "name": "unpack only: map keys and errors can have an encoding",
+      "pack": false,
+      "value": { "type": "map", "value": { "k": { "type": "error", "value": "hé" } } },
+      "wit": { "value": { "type": "map", "value": [[{ "encoding": "UTF-16LE", "data": "6b00" }, 0]] }, "nodes": [
+        { "type": "error", "value": { "encoding": "UTF-16LE", "data": "6800e900" } }
+      ] } },
+    { "name": "unpack only: an empty list with no node list",
+      "pack": false,
+      "value": { "type": "list", "value": [] },
+      "wit": { "value": { "type": "list", "value": [] }, "nodes": null } },
+    { "name": "unpack only: an empty map with no node list",
+      "pack": false,
+      "value": { "type": "map", "value": {} },
+      "wit": { "value": { "type": "map", "value": [] }, "nodes": null } },
+    { "name": "unpack only: map entries need not be in key order",
+      "pack": false,
+      "value": { "type": "map", "value": {
+        "a": { "type": "int", "value": "1" },
+        "b": { "type": "int", "value": "2" }
+      } },
+      "wit": { "value": { "type": "map", "value": [["b", 0], ["a", 1]] }, "nodes": [
+        { "type": "int", "value": "2" },
+        { "type": "int", "value": "1" }
+      ] } },
+    { "name": "unpack only: a node can be referred to more than once",
+      "pack": false,
+      "value": { "type": "list", "value": [
+        { "type": "int", "value": "1" },
+        { "type": "int", "value": "1" }
+      ] },
+      "wit": { "value": { "type": "list", "value": [0, 0] }, "nodes": [ { "type": "int", "value": "1" } ] } },
+    { "name": "unpack only: nodes the root does not reach are ignored",
+      "pack": false,
+      "value": { "type": "list", "value": [ { "type": "int", "value": "2" } ] },
+      "wit": { "value": { "type": "list", "value": [1] }, "nodes": [
+        { "type": "int", "value": "1" },
+        { "type": "int", "value": "2" }
+      ] } },
+    { "name": "unpack only: nodes with a scalar root are ignored",
+      "pack": false,
+      "value": { "type": "int", "value": "1" },
+      "wit": { "value": { "type": "int", "value": "1" }, "nodes": [ { "type": "int", "value": "2" } ] } },
+
+    { "name": "unpack error: a list index past the end of the nodes",
+      "unpack_error": "index-out-of-range",
+      "wit": { "value": { "type": "list", "value": [1] }, "nodes": [ { "type": "null" } ] } },
+    { "name": "unpack error: a map index past the end of the nodes",
+      "unpack_error": "index-out-of-range",
+      "wit": { "value": { "type": "map", "value": [["a", 1]] }, "nodes": [ { "type": "null" } ] } },
+    { "name": "unpack error: an index in a nested node past the end of the nodes",
+      "unpack_error": "index-out-of-range",
+      "wit": { "value": { "type": "list", "value": [0] }, "nodes": [ { "type": "list", "value": [5] } ] } },
+    { "name": "unpack error: a list with indices and no nodes",
+      "unpack_error": "index-out-of-range",
+      "wit": { "value": { "type": "list", "value": [0] }, "nodes": null } },
+    { "name": "unpack error: a map with entries and no nodes",
+      "unpack_error": "index-out-of-range",
+      "wit": { "value": { "type": "map", "value": [["a", 0]] }, "nodes": null } },
+    { "name": "unpack error: a node that refers to itself",
+      "unpack_error": "index-not-forward",
+      "wit": { "value": { "type": "list", "value": [0] }, "nodes": [ { "type": "list", "value": [0] } ] } },
+    { "name": "unpack error: a node that refers to an earlier node",
+      "unpack_error": "index-not-forward",
+      "wit": { "value": { "type": "list", "value": [1] }, "nodes": [
+        { "type": "null" },
+        { "type": "list", "value": [0] }
+      ] } },
+    { "name": "unpack error: two nodes that refer to each other",
+      "unpack_error": "index-not-forward",
+      "wit": { "value": { "type": "map", "value": [["a", 0]] }, "nodes": [
+        { "type": "map", "value": [["b", 1]] },
+        { "type": "map", "value": [["c", 0]] }
+      ] } },
+
+    { "name": "nesting: 128 lists deep is the most there can be",
+      "nested_lists": 128 },
+    { "name": "nesting: 129 lists deep is too deep to pack or unpack",
+      "nested_lists": 129,
+      "error": "too-deep" }
+  ]
+}
