@@ -9,6 +9,8 @@
 //!   pre-order: a node comes first, then everything beneath it, then its next sibling. Packing an
 //!   empty list or map gives an empty node list, not none.
 //! * Map entries are in key order, compared as UTF-8 bytes.
+//! * Lists and maps nest at most [`MAX_DEPTH`] deep, so that converting a value cannot exhaust the
+//!   stack.
 //!
 //! The `conformance/data-values` vectors in the repository pin this down, and every SDK runs them.
 
@@ -20,22 +22,34 @@ use crate::bindings::drift::plugins::data_values::{
 };
 use crate::value::DataValue;
 
+/// The most lists and maps a value can nest, counting the root as one.
+///
+/// It is the recursion limit `serde_json` uses, so a value parsed from JSON is never over it. A value
+/// that is deeper cannot be packed, and a `data-value` that is deeper cannot be unpacked.
+pub const MAX_DEPTH: usize = 128;
+
 /// Why a value could not be packed.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum PackError {
     /// Nodes are addressed by a `u16`, so a value can have at most 65,536 nodes beneath its root.
     TooManyNodes,
+    /// The value nests lists and maps more than [`MAX_DEPTH`] deep.
+    TooDeep,
 }
 
 impl Display for PackError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-      PackError::TooManyNodes => write!(
-        f,
-        "the value has more than {} nodes below its root, which is the most a data-value can address",
-        u16::MAX as usize + 1
-      )
-    }
+            PackError::TooManyNodes => {
+                write!(f, "the value has more than 65,536 nodes below its root")
+            }
+            PackError::TooDeep => {
+                write!(
+                    f,
+                    "the value nests lists and maps more than {MAX_DEPTH} deep"
+                )
+            }
+        }
     }
 }
 
@@ -59,6 +73,8 @@ pub enum UnpackError {
         /// The node that used it.
         parent: u16,
     },
+    /// Lists and maps nest more than [`MAX_DEPTH`] deep.
+    TooDeep,
 }
 
 impl Display for UnpackError {
@@ -76,6 +92,9 @@ impl Display for UnpackError {
                     "node {parent} refers to node {index}, which is not after it"
                 )
             }
+            UnpackError::TooDeep => {
+                write!(f, "lists and maps nest more than {MAX_DEPTH} deep")
+            }
         }
     }
 }
@@ -85,7 +104,8 @@ impl std::error::Error for UnpackError {}
 impl DataValue {
     /// Flattens this value into the form that crosses the plugin boundary.
     ///
-    /// Fails with [`PackError::TooManyNodes`] when there are too many nodes to address.
+    /// Fails with [`PackError::TooManyNodes`] when there are too many nodes to address, and with
+    /// [`PackError::TooDeep`] when lists and maps nest more than [`MAX_DEPTH`] deep.
     pub fn pack(&self) -> Result<WitDataValue, PackError> {
         let mut nodes = Vec::new();
         let value = match self {
@@ -98,7 +118,7 @@ impl DataValue {
             DataValue::Bytes(b) => DataValueInner::Bytes(b.clone()),
             DataValue::Error(e) => DataValueInner::Error(e.into()),
             DataValue::List(_) | DataValue::Map(_) => {
-                let inner = pack_children(self, &mut nodes)?;
+                let inner = pack_children(self, &mut nodes, 1)?;
                 return Ok(WitDataValue {
                     value: inner,
                     nodes: Some(nodes),
@@ -110,24 +130,29 @@ impl DataValue {
 
     /// Rebuilds a value from the form that crosses the plugin boundary.
     ///
-    /// Text that is not valid in its encoding is decoded lossily. See [`UnpackError`] for what is
-    /// rejected.
+    /// Text that is not valid in its encoding is decoded lossily. Lists and maps may nest at most
+    /// [`MAX_DEPTH`] deep. See [`UnpackError`] for what is rejected.
     pub fn unpack(value: &WitDataValue) -> Result<DataValue, UnpackError> {
         let nodes = value.nodes.as_deref().unwrap_or(&[]);
-        unpack_inner(&value.value, nodes, None)
+        unpack_inner(&value.value, nodes, None, 0)
     }
 }
 
-/// Packs a list or map, whose children go into `nodes`. Returns the node that describes it.
+/// Packs a list or map, whose children go into `nodes`. Returns the node that describes it. `depth`
+/// is how many lists and maps it is inside, counting itself.
 fn pack_children(
     value: &DataValue,
     nodes: &mut Vec<DataValueInner>,
+    depth: usize,
 ) -> Result<DataValueInner, PackError> {
+    if depth > MAX_DEPTH {
+        return Err(PackError::TooDeep);
+    }
     match value {
         DataValue::List(list) => {
             let mut indices = Vec::with_capacity(list.len());
             for child in list {
-                indices.push(pack_node(child, nodes)?);
+                indices.push(pack_node(child, nodes, depth)?);
             }
             Ok(DataValueInner::List(indices))
         }
@@ -136,7 +161,7 @@ fn pack_children(
             keys.sort();
             let mut entries = Vec::with_capacity(keys.len());
             for key in keys {
-                entries.push((key.into(), pack_node(&map[key], nodes)?));
+                entries.push((key.into(), pack_node(&map[key], nodes, depth)?));
             }
             Ok(DataValueInner::Map(entries))
         }
@@ -144,8 +169,13 @@ fn pack_children(
     }
 }
 
-/// Adds `value`, then everything beneath it, to `nodes`. Returns the index it was given.
-fn pack_node(value: &DataValue, nodes: &mut Vec<DataValueInner>) -> Result<u16, PackError> {
+/// Adds `value`, then everything beneath it, to `nodes`. Returns the index it was given. `depth` is
+/// how many lists and maps contain it.
+fn pack_node(
+    value: &DataValue,
+    nodes: &mut Vec<DataValueInner>,
+    depth: usize,
+) -> Result<u16, PackError> {
     let index = u16::try_from(nodes.len()).map_err(|_| PackError::TooManyNodes)?;
     // Reserve the slot first so the node precedes its children.
     nodes.push(DataValueInner::Null);
@@ -158,18 +188,25 @@ fn pack_node(value: &DataValue, nodes: &mut Vec<DataValueInner>) -> Result<u16, 
         DataValue::Boolean(b) => DataValueInner::Boolean(*b),
         DataValue::Bytes(b) => DataValueInner::Bytes(b.clone()),
         DataValue::Error(e) => DataValueInner::Error(e.into()),
-        DataValue::List(_) | DataValue::Map(_) => pack_children(value, nodes)?,
+        DataValue::List(_) | DataValue::Map(_) => pack_children(value, nodes, depth + 1)?,
     };
     nodes[index as usize] = inner;
     Ok(index)
 }
 
-/// Unpacks `inner`. `this` is the index of the node it came from, or none for the root.
+/// Unpacks `inner`. `this` is the index of the node it came from, or none for the root. `depth` is
+/// how many lists and maps contain it.
 fn unpack_inner(
     inner: &DataValueInner,
     nodes: &[DataValueInner],
     this: Option<u16>,
+    depth: usize,
 ) -> Result<DataValue, UnpackError> {
+    // What a list or map is inside, which is one more than what contains it.
+    let inside = depth + 1;
+    if inside > MAX_DEPTH && matches!(inner, DataValueInner::List(_) | DataValueInner::Map(_)) {
+        return Err(UnpackError::TooDeep);
+    }
     let child = |index: u16| -> Result<DataValue, UnpackError> {
         if let Some(parent) = this {
             if index <= parent {
@@ -182,7 +219,7 @@ fn unpack_inner(
                 index,
                 nodes: nodes.len(),
             })?;
-        unpack_inner(node, nodes, Some(index))
+        unpack_inner(node, nodes, Some(index), inside)
     };
 
     Ok(match inner {
@@ -557,6 +594,56 @@ mod tests {
         assert_eq!(string(None, &[0x68, 0xff]), "h\u{fffd}");
         // An encoding we do not know is read as UTF-8.
         assert_eq!(string(Some("latin-1"), b"abc"), "abc");
+    }
+
+    /// `depth` lists, each inside the last, with an empty list at the bottom.
+    fn nested_lists(depth: usize) -> DataValue {
+        (1..depth).fold(DataValue::List(vec![]), |inner, _| {
+            DataValue::List(vec![inner])
+        })
+    }
+
+    #[test]
+    fn nesting_is_limited() {
+        let at_limit = nested_lists(MAX_DEPTH);
+        let packed = at_limit.pack().unwrap();
+        assert_eq!(DataValue::unpack(&packed).unwrap(), at_limit);
+
+        assert_eq!(nested_lists(MAX_DEPTH + 1).pack(), Err(PackError::TooDeep));
+
+        // Maps count as nesting too, and so do maps inside lists.
+        let mut mixed = DataValue::List(vec![]);
+        for level in 1..MAX_DEPTH {
+            mixed = if level % 2 == 0 {
+                DataValue::List(vec![mixed])
+            } else {
+                map([("k", mixed)])
+            };
+        }
+        assert!(mixed.pack().is_ok());
+        assert_eq!(map([("k", mixed)]).pack(), Err(PackError::TooDeep));
+    }
+
+    #[test]
+    fn unpack_stops_at_the_nesting_limit() {
+        // A chain of nodes, each a list holding the next, is a valid encoding however long it is.
+        let chain = |links: usize| {
+            let mut nodes: Vec<DataValueInner> = (1..links)
+                .map(|next| DataValueInner::List(vec![next as u16]))
+                .collect();
+            nodes.push(DataValueInner::List(vec![]));
+            wit(DataValueInner::List(vec![0]), Some(nodes))
+        };
+
+        // The root and `links` nodes are all lists.
+        assert!(DataValue::unpack(&chain(MAX_DEPTH - 1)).is_ok());
+        assert_eq!(
+            DataValue::unpack(&chain(MAX_DEPTH)),
+            Err(UnpackError::TooDeep)
+        );
+
+        // The longest chain a data-value can hold would nest 65,536 deep.
+        assert_eq!(DataValue::unpack(&chain(65_536)), Err(UnpackError::TooDeep));
     }
 
     #[test]

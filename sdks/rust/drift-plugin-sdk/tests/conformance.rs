@@ -7,7 +7,7 @@ use std::path::PathBuf;
 use drift_plugin_sdk::bindings::drift::plugins::data_values::{
     DataValue as WitDataValue, DataValueInner, StringValue,
 };
-use drift_plugin_sdk::{DataValue, UnpackError};
+use drift_plugin_sdk::{DataValue, PackError, UnpackError};
 use serde_json::Value as Json;
 
 fn field<'a>(json: &'a Json, name: &str) -> &'a Json {
@@ -165,10 +165,40 @@ fn wit(json: &Json) -> WitDataValue {
     }
 }
 
-fn error_kind(error: UnpackError) -> &'static str {
+/// The value and encoding for a `nested_lists` vector: `depth` lists, each holding the next, with an
+/// empty list at the bottom. The encoding is the root list `[0]` and `depth - 1` nodes, each a list of
+/// the next node, the last an empty list. See the README.
+fn nested_lists(depth: usize) -> (DataValue, WitDataValue) {
+    assert!(
+        depth >= 2,
+        "a nested_lists vector needs a depth of at least 2"
+    );
+    let value = (1..depth).fold(DataValue::List(vec![]), |inner, _| {
+        DataValue::List(vec![inner])
+    });
+    let mut nodes: Vec<DataValueInner> = (1..depth - 1)
+        .map(|next| DataValueInner::List(vec![u16::try_from(next).expect("a small depth")]))
+        .collect();
+    nodes.push(DataValueInner::List(vec![]));
+    let packed = WitDataValue {
+        value: DataValueInner::List(vec![0]),
+        nodes: Some(nodes),
+    };
+    (value, packed)
+}
+
+fn unpack_error_kind(error: UnpackError) -> &'static str {
     match error {
         UnpackError::IndexOutOfRange { .. } => "index-out-of-range",
         UnpackError::IndexNotForward { .. } => "index-not-forward",
+        UnpackError::TooDeep => "too-deep",
+    }
+}
+
+fn pack_error_kind(error: PackError) -> &'static str {
+    match error {
+        PackError::TooManyNodes => "too-many-nodes",
+        PackError::TooDeep => "too-deep",
     }
 }
 
@@ -195,6 +225,38 @@ fn data_value_vectors() {
     for vector in vectors {
         let name = text(field(vector, "name"));
         assert!(names.insert(name), "two vectors are called `{name}`");
+
+        if let Some(depth) = vector.get("nested_lists") {
+            let depth = depth.as_u64().expect("a number") as usize;
+            let (value, packed) = nested_lists(depth);
+            match vector.get("error") {
+                None => {
+                    if DataValue::unpack(&packed) != Ok(value.clone()) {
+                        failures.push(format!("{name}: unpack did not give the value"));
+                    }
+                    if value.pack().as_ref() != Ok(&packed) {
+                        failures.push(format!("{name}: pack did not give the encoding"));
+                    }
+                }
+                Some(kind) => {
+                    let kind = text(kind);
+                    match value.pack() {
+                        Err(e) if pack_error_kind(e) == kind => {}
+                        other => {
+                            failures.push(format!("{name}: pack gave {other:?}, wanted {kind}"))
+                        }
+                    }
+                    match DataValue::unpack(&packed) {
+                        Err(e) if unpack_error_kind(e) == kind => {}
+                        other => {
+                            failures.push(format!("{name}: unpack gave {other:?}, wanted {kind}"))
+                        }
+                    }
+                }
+            }
+            continue;
+        }
+
         let packed = wit(field(vector, "wit"));
 
         if let Some(expected) = vector.get("unpack_error") {
@@ -202,7 +264,7 @@ fn data_value_vectors() {
                 Ok(unpacked) => {
                     failures.push(format!("{name}: unpacked to {unpacked:?}, wanted an error"))
                 }
-                Err(e) if error_kind(e) == text(expected) => {}
+                Err(e) if unpack_error_kind(e) == text(expected) => {}
                 Err(e) => failures.push(format!("{name}: got {e:?}, wanted {expected}")),
             }
             continue;

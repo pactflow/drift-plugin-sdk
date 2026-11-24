@@ -38,6 +38,6 @@ pub mod bindings;
 mod convert;
 mod value;
 
-pub use convert::{PackError, UnpackError};
+pub use convert::{PackError, UnpackError, MAX_DEPTH};
 pub use value::DataValue;
 pub use wit_bindgen;

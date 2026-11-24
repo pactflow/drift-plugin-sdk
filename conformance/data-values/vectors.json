@@ -299,6 +299,12 @@
       "wit": { "value": { "type": "map", "value": [["a", 0]] }, "nodes": [
         { "type": "map", "value": [["b", 1]] },
         { "type": "map", "value": [["c", 0]] }
-      ] } }
+      ] } },
+
+    { "name": "nesting: 128 lists deep is the most there can be",
+      "nested_lists": 128 },
+    { "name": "nesting: 129 lists deep is too deep to pack or unpack",
+      "nested_lists": 129,
+      "error": "too-deep" }
   ]
 }

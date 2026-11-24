@@ -279,6 +279,16 @@ impl<T: Into<DataValue>> From<Option<T>> for DataValue {
     }
 }
 
+/// Owned bytes become [`DataValue::Bytes`], not a list of numbers.
+///
+/// This and the conversion for `Vec<T>` below do not overlap because `u8` has no conversion to
+/// `DataValue`. Adding one would stop this crate compiling.
+impl From<Vec<u8>> for DataValue {
+    fn from(value: Vec<u8>) -> Self {
+        DataValue::Bytes(value)
+    }
+}
+
 impl<T: Into<DataValue>> From<Vec<T>> for DataValue {
     fn from(value: Vec<T>) -> Self {
         DataValue::List(value.into_iter().map(Into::into).collect())
@@ -317,6 +327,8 @@ mod tests {
         assert_eq!(DataValue::from(1u32), DataValue::UInteger(1));
         assert_eq!(DataValue::from(1usize), DataValue::UInteger(1));
         assert_eq!(DataValue::from(None::<String>), DataValue::Null);
+        assert_eq!(DataValue::from(vec![1u8, 2]), DataValue::Bytes(vec![1, 2]));
+        assert_eq!(DataValue::from(&[1u8, 2][..]), DataValue::Bytes(vec![1, 2]));
         assert_eq!(
             DataValue::from(vec!["a", "b"]),
             DataValue::List(vec![DataValue::from("a"), DataValue::from("b")])

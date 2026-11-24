@@ -23,7 +23,12 @@ their index in the node list, as a `u16`.
 - A map's entries are in key order, comparing keys as UTF-8 bytes. That is not the same as comparing
   UTF-16 code units, which JavaScript and Java do by default, so there are vectors for it.
 - Text is UTF-8, and no encoding is named.
-- A value with more nodes than a `u16` can address cannot be packed, and packing reports an error.
+- A value with more nodes than a `u16` can address cannot be packed, and packing reports
+  `too-many-nodes`. Vectors cannot show this, since they would need 65,537 nodes, so each SDK tests it
+  itself.
+- Lists and maps nest at most 128 deep, counting the root as one. A deeper value cannot be packed, and
+  packing reports `too-deep`. The limit is the recursion limit `serde_json` uses, so a value parsed
+  from JSON is never over it, and it keeps a deep value from exhausting the stack.
 
 **Unpacking** accepts more than packing produces:
 
@@ -36,6 +41,9 @@ their index in the node list, as a `u16`.
 - An index must be inside the node list, and inside a node it must be greater than that node's own
   index. A node that refers to itself or to an earlier node is an error, since following it could loop
   for ever. Unpacking reports `index-out-of-range` or `index-not-forward`.
+- Lists and maps nest at most 128 deep, as when packing, and a deeper encoding is `too-deep`. Every
+  forward-pointing chain of 65,536 nodes is a valid encoding, so this is what stops one from being
+  followed to the end.
 
 ## The file
 
@@ -43,7 +51,8 @@ their index in the node list, as a `u16`.
 { "format": 1, "vectors": [ { "name": "...", ... } ] }
 ```
 
-A vector has a unique `name` and a `wit` side. It also has either a `value` or an `unpack_error`.
+A vector has a unique `name` and one of three shapes: a `value` and a `wit`, a `wit` and an
+`unpack_error`, or `nested_lists`.
 
 - `value` is the value, tagged by `type`: `null`, `string`, `int`, `uint`, `double`, `boolean`,
   `bytes`, `error`, `list` and `map`. `int` and `uint` hold their number as a string, since 64-bit
@@ -55,8 +64,16 @@ A vector has a unique `name` and a `wit` side. It also has either a `value` or a
   `str`, `error` or map key is a string-value: a JSON string for UTF-8 with no encoding, or
   `{ "encoding": "...", "data": "<hex>" }`.
 
+`nested_lists` is a depth, at least 2, that stands for a value and its encoding, so that the file does
+not have to nest JSON that deeply (most JSON parsers refuse to). The value is that many lists, each
+holding the next, with an empty list at the bottom. The encoding is the root list `[0]` and that
+many minus one nodes, each a list holding the index after its own, and the last an empty list. With an
+`error`, packing the value and unpacking the encoding must both fail with it; without one, they must
+agree.
+
 A runner does this for each vector:
 
+- With `nested_lists`: as described above.
 - With `unpack_error`: unpacking `wit` must fail with that kind of error.
 - Otherwise: unpacking `wit` must give `value`, and, unless the vector has `"pack": false`, packing
   `value` must give `wit`. `"pack": false` marks a vector whose `wit` is a form that unpacking accepts
