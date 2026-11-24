@@ -1,0 +1,630 @@
+// SPDX-License-Identifier: Apache-2.0
+//
+// The Drift plugin interface. Plugins are WebAssembly components that implement parts of it.
+// Drift publishes each version of it with its releases, and the version on the package line is
+// set by the release tooling: see Documentation/ReleaseProcess.md.
+
+package drift:plugins@1.0.0;
+
+interface data-values {
+  // String values with the encoding specified. The default is UTF-8.
+  record string-value {
+    encoding: option<string>,
+    data: list<u8>
+  }
+
+  variant data-value-inner {
+    null,
+    str(string-value),
+    int(s64),
+    uint(u64),
+    double(f64),
+    boolean(bool),
+    bytes(list<u8>),
+    error(string-value),
+    %list(list<u16>),
+    %map(list<tuple<string-value, u16>>)
+  }
+
+  // Data values that can be safely passed around. As WIT does not allow recursive definitions,
+  // the the array and map options just store indices into the nodes array.
+  // See pack_unpack.rs for examples of functions that support this format.
+  record data-value {
+    value: data-value-inner,
+    nodes: option<list<data-value-inner>>
+  }
+}
+
+interface logger {
+  use data-values.{string-value};
+
+  enum level {
+    FATAL,
+    ERROR,
+    WARN,
+    INFO,
+    DEBUG,
+    TRACE
+  }
+
+  // Log a message to the host logging framework. If the log level is not provided, it will be
+  // printed to standard out instead
+  log: func(message: string-value, level: option<level>);
+
+  // Gets the current log level
+  log-level: func() -> level;
+
+  // Returns the current terminal dimensions as (columns, rows), or none when stdout is not
+  // an interactive terminal (e.g. CI, piped output). Plugins should fall back to a sensible
+  // default such as 80 columns when the value is absent.
+  terminal-size: func() -> option<tuple<u16, u16>>;
+}
+
+interface config {
+  use data-values.{data-value, string-value};
+
+  // Get the application configuration. Note that any paths defined in the config
+  // are paths on the Host. Plugins will have some of the paths mounted. For instance,
+  // 'output_dir' will be mounted as '/out' in the plugin component.
+  get-config: func() -> data-value;
+
+  // Get the plugin specific config. This will be all the values under the plugin name.
+  get-plugin-config: func() -> option<data-value>;
+
+  // Get the file contents from an entry in the plugin config. The returned value will be the bytes from the
+  // file that the config value points to. If the file load fails, the error will be returned. If the key does
+  // not exist, or the value does not point to an existing file, a none will be returned.
+  get-plugin-config-file-value: func(key: string-value) -> result<option<data-value>, string-value>;
+}
+
+interface http {
+  use data-values.{data-value, string-value};
+
+  // Execute an HTTP request and return the raw response. Request data can contain:
+  //   base-uri - base URI to use (required, can include a path)
+  //   method - HTTP method, defaults to GET
+  //   path - Path defaults to '/'
+  //   query - Query string. Can be a String or a Map. A Map will converted to the canonical form.
+  //   headers - Map form
+  //   Body - Can be a String or Byte Array
+  execute-request: func(request: data-value) -> result<data-value, string-value>;
+}
+
+/// HTTP/2 request execution with trailer support.
+/// Identical request shape to the `http` interface; the response data-value additionally
+/// includes a `trailers` key (map of trailer-name → value) when the server sends HTTP/2
+/// trailers. The `trailers` key is absent when no trailers are received.
+/// Use this interface instead of `http` when the underlying transport must be HTTP/2
+/// (e.g. gRPC, which requires HTTP/2 and carries status in trailers).
+interface http2 {
+  use data-values.{data-value, string-value};
+
+  execute-request: func(request: data-value) -> result<data-value, string-value>;
+}
+
+/// Spawning and communicating with a child process over its standard streams.
+///
+/// Provided for protocols whose transport is a client-launched subprocess speaking a
+/// line-delimited format — MCP's stdio transport is the motivating case. The host owns the
+/// process lifecycle; the plugin holds the handle for as long as it needs the connection,
+/// which allows one spawn to serve many operations rather than one spawn per call.
+///
+/// Plugins that do not need subprocesses can ignore this interface (it is still imported as part of the shared plugin world).
+interface process {
+  /// A running child process with piped stdin and stdout.
+  resource child-process {
+    /// Writes a line to the process's stdin, appending a newline, and flushes.
+    ///
+    /// Returns an error string when the pipe is closed or the write fails.
+    write-line: func(line: string) -> result<_, string>;
+
+    /// Reads one newline-delimited line from the process's stdout, blocking until a line is
+    /// available or the timeout expires. The trailing newline is not included.
+    ///
+    /// Returns none on clean end-of-stream, and an error string on timeout or read failure.
+    read-line: func(timeout-ms: u64) -> result<option<string>, string>;
+
+    /// Returns any output the process has written to stderr since the last call. Never blocks.
+    /// Servers are permitted to log freely to stderr, so this is diagnostic only.
+    read-stderr: func() -> string;
+
+    /// Closes stdin and waits briefly for the process to exit, killing it if it does not.
+    /// Idempotent.
+    shutdown: func();
+  }
+
+  /// Spawns a command with stdin and stdout piped.
+  ///
+  /// The command and arguments are passed to the OS without shell interpretation.
+  spawn: func(command: string, args: list<string>, env: list<tuple<string, string>>)
+    -> result<child-process, string>;
+}
+
+interface plugin-manifest {
+  use data-values.{data-value, string-value};
+
+  // This enum type is provided as a reference, the actual value will be an integer
+  variant capability-type {
+    // Plugin provides a source file format that provides test cases (currently unsupported)
+    TESTCASE-FILE, // 1
+    // Plugin provides a source file format that provides details about operations (for example OAS)
+    OPERATION-FILE, // 2
+    // Plugin provides dataset source files
+    DATASET-FILE, // 3
+    // Plugin provides data values that can be bound to a test value
+    DATA-VALUES, // 4
+    // Plugin provides a validator (currently unsupported)
+    DATA-VALIDATOR, // 5
+    // Plugin provides test setup functionality (currently unsupported)
+    TEST-LIFECYCLE, // 6
+    // Network Transports (for example HTTP or gRPC)
+    NETWORK-TRANSPORT, // 7
+    // Data formats (for example JSON)
+    DATA-FORMAT, // 8
+    // All other types.
+    OTHER(u16) // 9+
+  }
+
+  record capability {
+    // Key the capability will be stored against
+    key: string-value,
+    // Type of capability provided (See capability-type enum for the supported values)
+    capability: u16,
+    // Any metadata associated with the capability
+    metadata: list<tuple<string-value, data-value>>
+  }
+
+  // The capabilities that the plugin provides
+  record manifest {
+    // Name of the plugin
+    name: string-value,
+    // Version of the plugin
+    version: string-value,
+    // Description of the plugin
+    description: string-value,
+    // Interface version the plugin supports
+    interface-version: u16,
+    // Main capabilities provided by the plugin
+    capabilities: list<capability>,
+    // Events the plugin responds to. * can be used to match all events or all events of a
+    // class. For instance, 'file:*' will match all file events, and '*:failed' would match
+    // all events where something has failed.
+    // To receive the events, the plugin must implement the events/callback interface.
+    events: list<string-value>
+  }
+
+  // Return the plugin capabilities, any catalog entries to be added to the global catalog
+  // and event listeners to register.
+  get-manifest: func() -> manifest;
+}
+
+interface file-loader {
+  use data-values.{string-value};
+
+  // If the file loader supports the given file. The header will contain the first 32 bytes of the file
+  can-load-file: func(file-name: string-value, file-ext: string-value, header: list<u8>) -> bool;
+
+  // If the file loader supports the given contents. The data will have been fetched from an URL and the
+  // content type will be the value of the content type response header. The header parameter will contain the first
+  // 32 bytes of the response.
+  can-load-contents: func(content-type: string-value, header: list<u8>) -> bool;
+}
+
+interface files {
+  // Handle to a file
+  resource file-handle {
+    // File name this handle refers to. This will only return a value for local files.
+    file-name: func() -> option<string>;
+    // File extension this handle refers to. This will only return a value for local files.
+    file-ext: func() -> option<string>;
+
+    // Content type of the file data. This will only return a value for remote files.
+    content-type: func() -> option<string>;
+
+    // Returns all the bytes in the file
+    read-all-bytes: func() -> result<list<u8>, string>;
+
+    // Returns the contents of the file as a UTF-8 encoded string
+    read-all-string: func() -> result<string, string>;
+  }
+}
+
+interface interop {
+  use data-values.{data-value};
+
+  // Forward parameters
+  record forward-params {
+    // Capability that is required to handle the data
+    capability: string,
+    // Key for the capability
+    key: string,
+    // Operation to invoke
+    operation: string,
+    // Any data to send
+    data: data-value
+  }
+
+  // Yield parameters
+  record yield-params {
+    // Capability that is required to handle the data
+    capability: string,
+    // Key for the capability
+    key: string,
+    // Operation to invoke
+    operation: string,
+    // Any data to send
+    data: data-value,
+    // Any reference data to return
+    reference-data: data-value
+  }
+
+  // Result that can be partially completed now and fulfilled later by another plugin
+  variant future-computation {
+    // When the value is complete.
+    // Note: the success arm uses tuple<data-value> (a 1-tuple) rather than a plain data-value.
+    // This was originally intended to support multiple return values that were never needed.
+    // It cannot be changed without a breaking interface version increment.
+    // When the interface version is next bumped, this should be changed to result<data-value, data-value>.
+    completed(result<tuple<data-value>, data-value>),
+    // When the value needs to be completed by another plugin. The result will not be returned to this plugin.
+    forward(forward-params),
+    // When the value needs to be completed by another plugin and then returned. The result will be
+    // passed back via the continue-work function.
+    yield(yield-params)
+  }
+
+  // Opaque handle returned by begin-async-operation and passed unchanged to
+  // complete-async-operation. The plugin uses the id to look up its in-memory broker state.
+  record async-handle {
+    id: string
+  }
+
+  // Outcome passed to complete-async-operation describing what happened during the host-side
+  // step that ran between begin-async-operation and complete-async-operation.
+  variant async-outcome {
+    // The preceding host step succeeded; the plugin should proceed with broker work (e.g. read
+    // the captured message after a trigger fired, or complete a request-reply round-trip).
+    proceed,
+    // The preceding host step failed; the plugin should abort and surface this error.
+    error(string)
+  }
+
+  // Callback to continue work after it was yielded to another plugin
+  continue-work: func(value: result<data-value, data-value>, reference: data-value) -> future-computation;
+}
+
+interface operations {
+  use data-values.{data-value};
+  use files.{file-handle};
+  use interop.{future-computation};
+
+  // Details about an operation
+  record operation {
+    // Unique ID for the operation
+    id: string,
+    // Description of the operation
+    description: string,
+    // Metadata for the operation. For operations that can multiple identifiers, the additional IDs can be passed in
+    // the metadata under an 'idAlias' key.
+    metadata: list<tuple<string, data-value>>
+  }
+
+  // Details about the loaded file
+  record file-details {
+    // Description of the type of file. This will be displayed to the user.
+    type-description: string,
+    // Operations that the file defined
+    operations: list<operation>
+  }
+
+  // Function to load the file defining the operations. Details should be stored as only IDs will
+  // passed in later functions calls.
+  load-file: func(file: file-handle, namespace: option<string>) -> result<file-details, string>;
+
+  // Function to prepare the data for the operation with the given ID.
+  prepare-operation: func(namespace: string, operation-id: string, inputs: data-value) -> future-computation;
+
+  // Function to invoke the operation with the given ID. The URL is what is supplied from the
+  // command line for the provider URL.
+  // Deprecated: implement operations-v2/invoke-operation-v2 instead. This function is retained
+  // for binary compatibility with plugins compiled against earlier interface versions; the host
+  // will call invoke-operation-v2 first and only fall back to this function when the
+  // operations-v2 interface is absent.
+  invoke-operation: func(namespace: string, operation-id: string, provider-url: string, request-data: data-value) -> future-computation;
+
+  // Function to validate the result of the operation.
+  // To return a failure, the error value can be a string describing the error,
+  // or a map keyed on types of errors.
+  // For instance, for an OAS operation, the result could be something like
+  // {
+  //    status_code: "Expected 200 OK but got 400", // single string error
+  //    schema: [ ... ] // List of errors from validating the JSON schema
+  // }
+  // Each error can be returned as a string, or a map structure with a 'location' and 'error'
+  // attribute (can include other values, but they may be ignored).
+  //
+  // Decision references: the returned data-value map (on both success and failure) MAY include a
+  // "decision_references" key whose value is a list of maps describing which spec elements were
+  // consulted to reach the pass/fail verdict. Each entry has a "type" field (e.g. "response",
+  // "mediaType", "schema", "message", "operation", "channel") plus protocol-specific fields such
+  // as "path", "method", "statusCode", "contentType", "schemaRef", and "description".
+  // The host extracts this key before processing the remaining map as validation errors.
+  //
+  // Deprecated: implement operations-v2/validate-operation-v2 instead. This function is retained
+  // for binary compatibility with plugins compiled against earlier interface versions; the host
+  // will call validate-operation-v2 first and only fall back to this function when the
+  // operations-v2 interface is absent.
+  validate-operation: func(namespace: string, operation-id: string, expectation: data-value, %result: data-value) -> future-computation;
+}
+
+/// Protocol-neutral v2 replacements for invoke-operation and validate-operation.
+/// Plugins that only support HTTP-based transports may omit this interface entirely; the host
+/// will detect its absence and fall back to the functions in the operations interface.
+/// Plugins that support non-HTTP transports (e.g. Kafka, AMQP) should export this interface
+/// instead of placing protocol-specific logic in the legacy operations functions.
+interface operations-v2 {
+  use data-values.{data-value};
+  use interop.{future-computation};
+
+  // Protocol-neutral replacement for invoke-operation. Accepts structured inputs rather than the
+  // HTTP-specific provider-url + request-data pair, making it suitable for non-HTTP transports
+  // (e.g. Kafka, AMQP).
+  invoke-operation-v2: func(namespace: string, operation-id: string, inputs: data-value) -> future-computation;
+
+  // Protocol-neutral replacement for validate-operation. Receives the execution plan from the
+  // prepare-operation call in addition to the standard validate-operation parameters.
+  // To return a failure, the error value can be a string describing the error,
+  // or a map keyed on types of errors.
+  // For instance, for an OAS operation, the result could be something like
+  // {
+  //    status_code: "Expected 200 OK but got 400", // single string error
+  //    schema: [ ... ] // List of errors from validating the JSON schema
+  // }
+  // Each error can be returned as a string, or a map structure with a 'location' and 'error'
+  // attribute (can include other values, but they may be ignored).
+  //
+  // Decision references: the returned data-value map (on both success and failure) MAY include a
+  // "decision_references" key whose value is a list of maps describing which spec elements were
+  // consulted to reach the pass/fail verdict. Each entry has a "type" field (e.g. "response",
+  // "mediaType", "schema", "message", "operation", "channel") plus protocol-specific fields such
+  // as "path", "method", "statusCode", "contentType", "schemaRef", and "description".
+  // The host extracts this key before processing the remaining map as validation errors.
+  validate-operation-v2: func(namespace: string, operation-id: string, plan: data-value, expectation: data-value, %result: data-value) -> future-computation;
+}
+
+interface operation-coverage {
+  use data-values.{string-value};
+
+  // An item the API definition says is worth testing (a response, an input value, ...).
+  // The fields match the items of the coverage artifact.
+  record coverage-item {
+    // Unique within the namespace, e.g. "addPet:response:200:application/json"
+    key: string-value,
+    // operation, response or request
+    level: string-value,
+    // operation, response, mediaType, param or field
+    kind: string-value,
+    // Key of the operation (method and path, i.e. "get:/products")
+    operation: string-value,
+    // Response status as written in the definition ("200", "4XX" or "default")
+    status: option<string-value>,
+    media-type: option<string-value>,
+    // Variant of a oneOf/anyOf schema
+    schema-variant: option<string-value>,
+    // Where an input is: query, path, header or body
+    location-in: option<string-value>,
+    // Name of the parameter or the path of the body field
+    name: option<string-value>,
+    // present, absent, null, value, variant, supported, missing or invalid
+    class: option<string-value>,
+    value: option<string-value>,
+    // Key of the parent item (the fields of a oneOf variant)
+    parent: option<string-value>
+  }
+
+  // A location in the definition that is not measured, with the reason (i.e. a depth limit)
+  record not-measured {
+    // Key of the operation (method and path, i.e. "post:/pet") it is in
+    operation: option<string-value>,
+    location: string-value,
+    reason: string-value,
+    depth: option<u32>
+  }
+
+  // The items to measure for a source, with the version of the rules they were derived by
+  record item-model {
+    // Changes when the way the items are derived changes, i.e. "oas-coverage/1"
+    model-version: string-value,
+    items: list<coverage-item>,
+    not-measured: list<not-measured>
+  }
+
+  // A different enum limit for one field
+  record field-limit {
+    // The operation: its operation ID, or its method and path (i.e. "post:/pet") if it has no ID
+    operation: string-value,
+    // Where the field is, i.e. "body.currency" or "query.status"
+    location: string-value,
+    large-enum-limit: u32
+  }
+
+  // The settings that decide which items a model has. They are part of the model, as other settings
+  // give other items.
+  record coverage-policy {
+    // An enum with more values than this is measured as supported and invalid, and not value by value
+    large-enum-limit: u32,
+    // How deep into nested objects of a request body the items go. Top level properties are at depth 1
+    max-depth: u32,
+    field-limits: list<field-limit>
+  }
+
+  // Sets the policy that the coverage evidence of the namespace is worked out with, which decides the
+  // keys of the items that an operation result hits (the enum limit and the depth give different
+  // items). The host calls it before the operations are verified, with the policy it will ask for the
+  // model with. A namespace that it was not called for has the default policy.
+  configure-coverage: func(namespace: string-value, policy: coverage-policy);
+
+  // Returns the items to measure for the source loaded into the namespace, derived with the policy.
+  // This does not depend on what the tests have done, so it returns the same model every time it is
+  // called with the same policy. Each item is hit by the `hits` in the `coverage_evidence` that the
+  // plugin returns from the operation validation, which name the items by their key.
+  coverage-model: func(namespace: string-value, policy: coverage-policy) -> option<item-model>;
+
+  // Coverage data point
+  record coverage-data {
+    // ID for the data point
+    id: string-value,
+    // Dimension of coverage calculated (like operation, media type or data field)
+    key: string-value,
+    // Dimension value
+    value: string-value,
+    // Total number of items defined
+    total-items: u16,
+    // Number of items fully accessed by the tests
+    covered: u16,
+    // Number of items partially accessed by the tests
+    partial: u16,
+    // Number of items missed by the tests
+    missed: u16,
+    // Source IDs of missed items
+    missing-ids: list<string-value>,
+    // Source IDs of partially matched items
+    partial-ids: list<string-value>,
+    // ID of the parent item
+    parent: option<string-value>,
+    // IDs of child items
+    children: list<string-value>
+  }
+
+  // Returns the details of which operations were not fully covered by the tests. This is
+  // called after each test case file has run, so it can be called more than once during a
+  // run and must not reset or finalise any state: each call must return the coverage
+  // accumulated so far. The results are keyed by type of coverage.
+  coverage: func(namespace: string-value) -> option<list<coverage-data>>;
+}
+
+interface data-format {
+  use data-values.{data-value};
+  use interop.{future-computation};
+
+  // If the plugin supports the given content type
+  supports-content-type: func(content-type: string) -> bool;
+
+  // Called to parse the data, which may be passed as string value or raw bytes.
+  // Content type will be the original content type received with attributes, for instance,
+  // for JSON it may be 'application/hal+json; charset=UTF-8'.
+  parse: func(data: data-value, content-type: option<string>) -> future-computation;
+
+  // Called to build the data format from the given data. This should pass back either a
+  // string value or raw bytes.
+  construct: func(data: data-value) -> future-computation;
+
+  // Called to validate the data format. An optional schema may be provided.
+  // Content type will be the original content type received with attributes, for instance,
+  // for JSON it may be 'application/hal+json; charset=UTF-8'.
+  // The return result should be a map keyed on types of errors. An empty map represents success.
+  // For instance, for JSON the result could be
+  // {
+  //    mismatches: [ ... ], // Mismatches from comparing the JSON
+  //    schema: [ ... ] // Errors from the JSON schema validation
+  // }
+  // Each error can be returned as a string, or a map structure with a 'location' and 'error'
+  // attribute (can include other values, but they may be ignored).
+  validate: func(expected: option<data-value>, actual: data-value, schema: option<data-value>, content-type: option<string>) -> future-computation;
+}
+
+interface events {
+  use data-values.{data-value, string-value};
+
+  // Call this function to fire an event. If anything else modifies the event data,
+  // the modified data will be returned.
+  fire-event: func(event: string-value, data: data-value) -> option<data-value>;
+}
+
+interface event-callback {
+  use data-values.{data-value, string-value};
+
+  // Called when a registered event occurs. The return value can be used for events
+  // that allow the event data to be modified and will be merged into the event data.
+  handler: func(event: string-value, data: data-value) -> option<data-value>;
+}
+
+interface data-sets {
+  use data-values.{data-value, string-value};
+  use files.{file-handle};
+
+  // Function to load the file defining the data set
+  load-file: func(file: file-handle, namespace: option<string>) -> result<list<string-value>, string-value>;
+
+  // Function to resolve a value given the namespace and expression. These should be resolved
+  // against the previously loaded data files. Return none in the case that the input
+  // values don't correspond to anything loaded by the plugin.
+  resolve-value: func(dataset: string-value, expression: string-value) -> option<result<data-value, string-value>>;
+}
+
+interface values {
+  use data-values.{data-value, string-value};
+
+  // Function to resolve a value given the namespace, expression and current operation.
+  // Return none in the case that the input values don't correspond to anything loaded by the plugin.
+  resolve-value: func(dataset: string-value, expression: string-value, operation: data-value) -> option<result<data-value, string-value>>;
+}
+
+interface network-transport {
+  use data-values.{data-value};
+  use interop.{future-computation};
+
+  /// Called during prepare-operation to resolve transport bindings and produce a transport plan.
+  /// The request is a data-value map containing the planning inputs assembled by the operation
+  /// plugin (e.g. the AsyncAPI plugin). The returned future-computation, when complete, carries
+  /// the resolved transport plan as a data-value map.
+  plan-transport: func(request: data-value) -> future-computation;
+}
+
+/// Async broker operations for transport plugins that support async execution patterns
+/// (observe, inject, inject-capture, request-reply). Only transport plugins that implement
+/// async broker semantics need to export this interface; sync-only transports omit it entirely.
+interface async-operations {
+  use data-values.{data-value};
+  use interop.{future-computation, async-handle, async-outcome};
+
+  /// Phase 1 of async execution: plugin opens a broker connection, subscribes to the target
+  /// channel, and stores the consumer handle in WASM linear memory. Returns an opaque handle
+  /// that the host passes back unchanged to complete-async-operation.
+  /// Used for: observe, inject-capture, request-reply.
+  begin-async-operation: func(namespace: string, operation-id: string, inputs: data-value) -> result<async-handle, string>;
+
+  /// Publishes a message to the broker channel. Called by the host for inject,
+  /// inject-capture, and request-reply modes before any hook fires.
+  /// inputs carries the resolved transport plan: connection details, channel, payload,
+  /// and any protocol-specific bindings.
+  publish-message: func(namespace: string, operation-id: string, inputs: data-value) -> future-computation;
+
+  /// Phase 2 of async execution: plugin retrieves the consumer by handle, blocks via WASI
+  /// sockets until a matching message arrives or the timeout expires, then returns the
+  /// captured message. outcome carries the result of any host-side trigger hook that ran
+  /// between the two phases.
+  /// Used for: observe, inject-capture, request-reply.
+  complete-async-operation: func(namespace: string, operation-id: string, handle: async-handle, outcome: async-outcome) -> future-computation;
+}
+
+world plugin {
+  import logger;
+  import http;
+  import http2;
+  import config;
+  import events;
+  import process;
+
+  export plugin-manifest;
+  export file-loader;
+  export operations;
+  export operations-v2;
+  export operation-coverage;
+  export interop;
+  export data-format;
+  export network-transport;
+  export async-operations;
+  export data-sets;
+  export event-callback;
+}

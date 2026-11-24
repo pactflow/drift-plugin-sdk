@@ -31,7 +31,10 @@ python: patch
 - The first heading is the changelog entry. Anything below it is the body; put the ticket there, if there
   is one.
 - A pull request with no release impact (a refactor, a test) gets the `no-release` label instead.
-- Documentation, CI and `wit/` changes need no change file.
+- Documentation, CI and the root `wit/wit.lock.json` need no change file. An SDK's vendored
+  `sdks/<name>/wit/` is under `sdks/<name>/`, so changing it does.
+- Commit, then run `just check-changeset origin/main` to see what the `changeset` check will say. It
+  compares committed changes only.
 
 ## The WIT
 
