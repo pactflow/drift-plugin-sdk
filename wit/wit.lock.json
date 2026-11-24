@@ -1,4 +1,9 @@
 {
   "package": "drift:plugins",
-  "versions": {}
+  "versions": {
+    "1.0.0": {
+      "plugin.wit": "fa1342424d9163601e79bb4d33348755e6b9072163cc5f9bf96853f983164af4",
+      "drift-plugins.wasm": "f70daaf93baf0a51736a8bbd564d3cf446ba9ec471d3e7f49a9901518bfa9c02"
+    }
+  }
 }
