@@ -5,9 +5,10 @@
 
 Prints the arguments on one line. knope wants `<package>=<version>` when knope.toml has
 several packages and the bare version when it has one, so this reads the packages from knope.toml and
-gives each case what it wants. A package that knope.toml does not have, a version that is not
-`major.minor.patch` (with an optional pre-release), or a package given twice is an error, here, rather
-than knope's less clear one.
+gives each case what it wants. These are errors here, rather than knope's less clear ones: a package that
+knope.toml does not have, a package given twice, and a version that is not `major.minor.patch` or
+`major.minor.patch-<label>.<number>` with no leading zeroes (`1.0.0-rc.1`; knope takes no other
+pre-release).
 """
 
 import re
@@ -16,7 +17,10 @@ import tomllib
 
 from sdks import ROOT, fail
 
-VERSION = re.compile(r"\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?")
+# `major.minor.patch`, or with a pre-release as `-<label>.<number>` (`1.0.0-rc.1`), which is the only
+# pre-release knope takes. SemVer's rules hold: no leading zeroes. knope itself accepts `01.2.3`.
+_NUMBER = r"0|[1-9]\d*"
+VERSION = re.compile(rf"({_NUMBER})\.({_NUMBER})\.({_NUMBER})(-[a-zA-Z][0-9a-zA-Z-]*\.({_NUMBER}))?")
 
 
 def main() -> None:
