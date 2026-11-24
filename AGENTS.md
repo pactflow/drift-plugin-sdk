@@ -134,7 +134,6 @@ So you do not mistake absence for a bug:
 - `conformance/data-values/` has vectors. `conformance/suites/` has none, and the end-to-end CI job that
   runs suites against a pinned Drift bundle is a TODO in `ci.yml`.
 - The plugin guide has not been moved here from Drift.
-- Nothing has been released. The first release needs a maintainer: the `release` environment, a first
-  publish by hand to claim the crate name, and a trusted publisher on crates.io; see
-  [`Documentation/releasing.md`](Documentation/releasing.md). It must also be given a version:
-  `prepare-release.yml` with `rust=<version>`.
+- Only the Rust SDK has been released (`0.1.0`, tag `rust/v0.1.0`). A new SDK's first release needs a
+  maintainer, as that one did: see [`Documentation/releasing.md`](Documentation/releasing.md). It must be
+  given a version: `prepare-release.yml` with `<name>=<version>`.
